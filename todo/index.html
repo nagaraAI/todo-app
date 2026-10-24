@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ToDo リスト</title>
+<style>
+  :root {
+    --bg: #f5f5f4;
+    --card: #ffffff;
+    --text: #1c1917;
+    --muted: #78716c;
+    --border: #e7e5e4;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1917;
+      --card: #292524;
+      --text: #f5f5f4;
+      --muted: #a8a29e;
+      --border: #44403c;
+      --accent: #3b82f6;
+      --danger: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  }
+  main {
+    max-width: 520px;
+    margin: 48px auto;
+    padding: 0 16px;
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  form { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
+  form input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+  }
+  form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: inherit;
+  }
+  .add {
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  li input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+  li .text { flex: 1; word-break: break-word; }
+  li.done .text { text-decoration: line-through; color: var(--muted); }
+  li .del { color: var(--muted); padding: 4px 8px; border-radius: 6px; opacity: 0.6; }
+  li .del:hover { color: var(--danger); opacity: 1; }
+  .empty { padding: 24px; text-align: center; color: var(--muted); }
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  .filters { display: flex; gap: 4px; }
+  .filters button { padding: 4px 10px; border-radius: 6px; }
+  .filters button.active { background: var(--accent); color: var(--accent-text); }
+  .clear:hover { color: var(--danger); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ToDo リスト</h1>
+  <div class="card">
+    <form id="form">
+      <input id="input" type="text" placeholder="やることを入力…" autocomplete="off" autofocus>
+      <button class="add" type="submit">追加</button>
+    </form>
+    <ul id="list"></ul>
+    <footer>
+      <span id="count"></span>
+      <div class="filters">
+        <button data-filter="all" class="active">すべて</button>
+        <button data-filter="active">未完了</button>
+        <button data-filter="done">完了</button>
+      </div>
+      <button class="clear" id="clear">完了済みを削除</button>
+    </footer>
+  </div>
+</main>
+<script>
+  const STORAGE_KEY = "simple-todo";
+  let todos = load();
+  let filter = "all";
+
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const list = document.getElementById("list");
+  const count = document.getElementById("count");
+
+  function load() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+    } catch {}
+  }
+
+  function render() {
+    const visible = todos.filter(t =>
+      filter === "all" ? true : filter === "done" ? t.done : !t.done
+    );
+
+    list.innerHTML = "";
+    if (visible.length === 0) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = todos.length === 0 ? "まだ ToDo はありません" : "該当する ToDo はありません";
+      list.appendChild(li);
+    }
+
+    for (const todo of visible) {
+      const li = document.createElement("li");
+      if (todo.done) li.classList.add("done");
+
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = todo.done;
+      check.addEventListener("change", () => {
+        todo.done = check.checked;
+        save();
+        render();
+      });
+
+      const text = document.createElement("span");
+      text.className = "text";
+      text.textContent = todo.text;
+
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "✕";
+      del.title = "削除";
+      del.addEventListener("click", () => {
+        todos = todos.filter(t => t.id !== todo.id);
+        save();
+        render();
+      });
+
+      li.append(check, text, del);
+      list.appendChild(li);
+    }
+
+    const remaining = todos.filter(t => !t.done).length;
+    count.textContent = `残り ${remaining} 件`;
+  }
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    todos.push({ id: Date.now(), text, done: false });
+    input.value = "";
+    save();
+    render();
+  });
+
+  document.querySelectorAll(".filters button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      filter = btn.dataset.filter;
+      document.querySelectorAll(".filters button").forEach(b => b.classList.toggle("active", b === btn));
+      render();
+    });
+  });
+
+  document.getElementById("clear").addEventListener("click", () => {
+    todos = todos.filter(t => !t.done);
+    save();
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>
